@@ -1,5 +1,7 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+
+type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 /**
  * Server-side Supabase client bound to the request's cookies, so the
@@ -18,7 +20,7 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieToSet[]) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
@@ -38,6 +40,13 @@ export function createServiceClient() {
   if (!url || !key) return null;
 
   return createServerClient(url, key, {
-    cookies: { getAll: () => [], setAll: () => {} },
+    cookies: {
+      getAll(): CookieToSet[] {
+        return [];
+      },
+      setAll(_cookiesToSet: CookieToSet[]) {
+        // No session to persist - this client never acts on behalf of a user.
+      },
+    },
   });
 }
