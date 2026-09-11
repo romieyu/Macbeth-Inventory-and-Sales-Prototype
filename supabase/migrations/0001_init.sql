@@ -168,3 +168,31 @@ create policy tenant_read on sales_day_history
 
 -- Scope-within-tenant (Area Manager sees their area only, Spec §5) is a second
 -- layer that lands in the milestone that introduces roles. Tenancy first.
+
+-- ------------------------------------------------------------------ grants ---
+-- The project is created with "automatically expose new tables" OFF, so a table
+-- is reachable through the Data API only when a migration says so. RLS decides
+-- WHICH rows a caller sees; these grants decide whether the table is visible to
+-- the API at all. Both are required — neither substitutes for the other.
+--
+-- 'anon' is deliberately absent. An unauthenticated caller has no organisation,
+-- so it would see nothing anyway; not granting it means a missing RLS policy can
+-- never leak to the open internet.
+
+grant usage on schema public to anon, authenticated;
+
+grant select on
+  organisation,
+  region,
+  area,
+  store,
+  ingestion_run,
+  sales_day,
+  sales_day_history
+to authenticated;
+
+grant execute on function current_organisation_id() to authenticated;
+
+-- No insert/update/delete grants. Phase 1 is a read-only reporting layer
+-- (Spec §1.1); ingestion runs under the service role, which bypasses both
+-- grants and RLS.
