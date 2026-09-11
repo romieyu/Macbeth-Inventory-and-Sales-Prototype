@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { pingSupabase } from '@/lib/supabase/ping';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,32 +8,18 @@ export const dynamic = 'force-dynamic';
  * Supabase is reachable. Never returns key values - only whether they are set.
  */
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  let database: 'not_configured' | 'reachable' | 'unreachable' = 'not_configured';
-
-  if (url && anon) {
-    try {
-      const res = await fetch(`${url}/rest/v1/`, {
-        headers: { apikey: anon },
-        cache: 'no-store',
-      });
-      database = res.ok ? 'reachable' : 'unreachable';
-    } catch {
-      database = 'unreachable';
-    }
-  }
+  const ping = await pingSupabase();
 
   return NextResponse.json({
     status: 'ok',
     app: 'macbeth-inventory-and-sales-prototype',
     environment: process.env.VERCEL_ENV ?? 'local',
     commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
-    supabase_url_set: Boolean(url),
-    supabase_anon_key_set: Boolean(anon),
+    supabase_url_set: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    supabase_anon_key_set: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     service_role_key_set: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    database,
+    database: ping.state,
+    database_http_status: ping.status,
     checked_at: new Date().toISOString(),
   });
 }

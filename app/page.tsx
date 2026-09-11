@@ -1,3 +1,5 @@
+import { pingSupabase, type DbState } from '@/lib/supabase/ping';
+
 export const dynamic = 'force-dynamic';
 
 type State = 'ok' | 'warn' | 'bad';
@@ -11,32 +13,32 @@ function Row({ label, value, state }: { label: string; value: string; state: Sta
   );
 }
 
-async function pingSupabase(): Promise<State> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return 'warn';
-  try {
-    const res = await fetch(`${url}/rest/v1/`, {
-      headers: { apikey: anon },
-      cache: 'no-store',
-    });
-    return res.ok ? 'ok' : 'bad';
-  } catch {
-    return 'bad';
-  }
-}
+const DB_LABEL: Record<DbState, string> = {
+  reachable: 'reachable',
+  not_configured: 'not configured',
+  unreachable: 'unreachable',
+};
+
+const DB_STATE: Record<DbState, State> = {
+  reachable: 'ok',
+  not_configured: 'warn',
+  unreachable: 'bad',
+};
 
 export default async function Home() {
   const urlSet = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const anonSet = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const serviceSet = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const db = await pingSupabase();
+
+  const ping = await pingSupabase();
 
   const env = process.env.VERCEL_ENV ?? 'local';
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
 
-  const dbLabel =
-    db === 'ok' ? 'reachable' : db === 'warn' ? 'not configured' : 'unreachable';
+  const dbValue =
+    ping.state === 'unreachable' && ping.status
+      ? `unreachable (HTTP ${ping.status})`
+      : DB_LABEL[ping.state];
 
   return (
     <main>
@@ -67,10 +69,10 @@ export default async function Home() {
         />
         <Row
           label="SUPABASE_SERVICE_ROLE_KEY"
-          value={serviceSet ? 'set' : 'missing'}
+          value={serviceSet ? 'set' : 'not needed yet'}
           state={serviceSet ? 'ok' : 'warn'}
         />
-        <Row label="Database" value={dbLabel} state={db} />
+        <Row label="Database" value={dbValue} state={DB_STATE[ping.state]} />
       </div>
 
       <h2>Gate for this milestone</h2>
