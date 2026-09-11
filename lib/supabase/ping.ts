@@ -7,11 +7,16 @@ export type PingResult = {
 };
 
 /**
- * Checks that the Supabase REST endpoint answers.
+ * Liveness check against the Supabase project.
  *
- * PostgREST behind Supabase wants BOTH headers: `apikey` identifies the project,
- * `Authorization` carries the caller's role. Sending only `apikey` gets a 401,
- * which looks like an outage but is just a malformed request.
+ * Uses the Auth service's health endpoint, which the publishable key is
+ * allowed to call. Do NOT point this at `/rest/v1/` — that root endpoint
+ * serves the API schema and accepts secret keys only, so a perfectly good
+ * publishable key gets a 401 there and the project looks down when it isn't.
+ *
+ * Table reads are a poor liveness probe too: RLS and grants mean an
+ * unauthenticated caller is *supposed* to be refused, so a refusal would
+ * prove nothing either way.
  */
 export async function pingSupabase(): Promise<PingResult> {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,11 +27,8 @@ export async function pingSupabase(): Promise<PingResult> {
   const url = raw.replace(/\/+$/, '');
 
   try {
-    const res = await fetch(`${url}/rest/v1/`, {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-      },
+    const res = await fetch(`${url}/auth/v1/health`, {
+      headers: { apikey: key },
       cache: 'no-store',
     });
     return { state: res.ok ? 'reachable' : 'unreachable', status: res.status };
